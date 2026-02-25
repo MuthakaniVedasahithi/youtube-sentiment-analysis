@@ -217,12 +217,7 @@ def home():
                     "neutral": neutral,
                     "wordcloud_image": img_buffer.getvalue()
                 }
-                report_data = {
-                    "video_stats": video_stats,
-                    "positive": positive,
-                    "negative": negative,
-                    "neutral": neutral
-                }
+
 
     return render_template(
         "index.html",
