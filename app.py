@@ -81,7 +81,7 @@ def get_comments(video_id):
 
     comments = []
     next_page_token = None
-    MAX_COMMENTS = 10  # 🔥 reduced for Railway
+    MAX_COMMENTS = 20
 
     try:
         while True:
