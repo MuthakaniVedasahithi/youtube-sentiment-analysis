@@ -7,6 +7,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from io import BytesIO
+from reportlab.platypus import Image as RLImage
+from reportlab.lib.utils import ImageReader
 import re
 import html
 import os
@@ -203,8 +205,18 @@ def home():
                 if not os.path.exists("static"):
                     os.makedirs("static")
 
-                wordcloud.to_file("static/wordcloud.png")
 
+                img_buffer = BytesIO()
+                wordcloud.to_image().save(img_buffer, format="PNG")
+                img_buffer.seek(0)
+
+                report_data = {
+                    "video_stats": video_stats,
+                    "positive": positive,
+                    "negative": negative,
+                    "neutral": neutral,
+                    "wordcloud_image": img_buffer.getvalue()
+                }
                 report_data = {
                     "video_stats": video_stats,
                     "positive": positive,
@@ -258,7 +270,16 @@ def download_report():
     elements.append(Paragraph(f"Positive: {report_data['positive']}", styles["Normal"]))
     elements.append(Paragraph(f"Negative: {report_data['negative']}", styles["Normal"]))
     elements.append(Paragraph(f"Neutral: {report_data['neutral']}", styles["Normal"]))
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 20))
+
+    # Add WordCloud if available
+    if "wordcloud_image" in report_data:
+        elements.append(Paragraph("<b>Word Cloud:</b>", styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+
+        img_buffer = BytesIO(report_data["wordcloud_image"])
+        image = RLImage(img_buffer, width=5 * inch, height=3 * inch)
+        elements.append(image)
 
     doc.build(elements)
 
@@ -270,6 +291,5 @@ def download_report():
         download_name="YouTube_Analysis_Report.pdf",
         mimetype="application/pdf"
     )
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
