@@ -2,7 +2,7 @@ Flask==3.1.3
 gunicorn==25.1.0
 google-api-python-client==2.190.0
 transformers==4.41.2
-torch==2.2.2
+torch==2.5.1
 numpy==2.2.6
 scipy==1.15.3
 wordcloud==1.9.6
