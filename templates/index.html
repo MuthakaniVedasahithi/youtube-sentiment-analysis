@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>YouTube Sentiment Analytics</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+<style>
+    body {
+    transition: all 0.4s ease;
+}
+
+/* DARK MODE */
+.dark-mode {
+    background: linear-gradient(135deg,#0f172a,#1e293b);
+    color: white;
+}
+
+.dark-mode .glass-card {
+    background: rgba(30,41,59,0.85);
+}
+
+.dark-mode .comment-card {
+    background:#1e293b;
+}
+
+/* LIGHT MODE */
+.light-mode {
+    background: linear-gradient(135deg,#f1f5f9,#e2e8f0);
+    color: black;
+}
+
+.light-mode .glass-card {
+    background: white;
+    color: black;
+}
+
+.light-mode .comment-card {
+    background:#f8fafc;
+}
+body {
+    background: linear-gradient(135deg,#0f172a,#1e293b);
+    font-family: 'Segoe UI', sans-serif;
+    color: white;
+}
+
+.glass-card {
+    background: rgba(30,41,59,0.85);
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    border-radius: 14px;
+    padding: 15px;
+    text-align:center;
+    font-weight:600;
+}
+
+.positive {background:linear-gradient(45deg,#16a34a,#22c55e);}
+.negative {background:linear-gradient(45deg,#dc2626,#ef4444);}
+.neutral  {background:linear-gradient(45deg,#f59e0b,#fbbf24); color:black;}
+
+.comment-card {
+    background:#1e293b;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+}
+
+.comment-container {
+    max-height:350px;
+    overflow-y:auto;
+}
+
+.btn {
+    border-radius: 10px;
+    font-weight: 500;
+}
+    /* SIDEBAR BASE */
+.sidebar {
+    width: 260px;
+    padding: 25px;
+    min-height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    transition: all 0.4s ease;
+}
+
+/* DARK MODE SIDEBAR */
+.dark-mode .sidebar {
+    background: #0f172a;
+    color: white;
+}
+
+/* LIGHT MODE SIDEBAR */
+.light-mode .sidebar {
+    background: #ffffff;
+    color: black;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.08);
+}
+    .sidebar ul {
+    padding-left: 18px;
+}
+
+.sidebar li {
+    margin-bottom: 6px;
+}
+</style>
+</head>
+
+<body class="dark-mode">
+
+<div class="d-flex">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+    <h4> Sentiment Guide</h4>
+
+    <h6 class="mt-4">Categories</h6>
+    <ul style="font-size:14px;">
+        <li>✔ Positive – Appreciation & praise</li>
+        <li>✔ Negative – Criticism & dislike</li>
+        <li>✔ Neutral – Balanced / Informative</li>
+    </ul>
+
+    <h6 class="mt-4"> AI Features</h6>
+    <ul style="font-size:14px;">
+        <li>• Sentiment Classification</li>
+        <li>• Spam Detection</li>
+        <li>• Word Cloud</li>
+        <li>• Download Report</li>
+    </ul>
+
+    <h6 class="mt-4"> Insights</h6>
+    <ul style="font-size:14px;">
+        <li>• Audience Reaction Analysis</li>
+        <li>• Engagement Metrics</li>
+        <li>• Comment Behavior Study</li>
+    </ul>
+
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="container mt-5" style="margin-left:280px;">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>YouTube Sentiment Dashboard</h2>
+    <button id="themeBtn" class="btn btn-outline-light" onclick="toggleTheme()">
+        🌙 Dark Mode
+    </button>
+</div>
+<form method="POST" class="mb-5">
+    <div class="input-group">
+        <input type="text" name="link" class="form-control"
+               placeholder="Paste YouTube link here..." required>
+        <button class="btn btn-primary">Analyze</button>
+    </div>
+</form>
+
+{% if video_stats %}
+
+{% set total = positive + negative + neutral %}
+{% if total == 0 %}{% set total = 1 %}{% endif %}
+
+<!-- VIDEO INFO -->
+<div class="glass-card">
+    <h4>📹 Video Information</h4>
+    <h5>{{ video_stats.title }}</h5>
+
+    <div class="row text-center mt-4">
+        <div class="col-md-4">
+            <div class="metric-card neutral">
+                👁 Views
+                <h3>{{ video_stats.views }}</h3>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="metric-card positive">
+                👍 Likes
+                <h3>{{ video_stats.likes }}</h3>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="metric-card negative">
+                💬 Comments
+                <h3>{{ video_stats.comments_count }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SENTIMENT METRICS -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="metric-card positive">
+            Positive
+            <h3>{{ positive }}</h3>
+            {{ (positive/total*100)|round(1) }}%
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card negative">
+            Negative
+            <h3>{{ negative }}</h3>
+            {{ (negative/total*100)|round(1) }}%
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card neutral">
+            Neutral
+            <h3>{{ neutral }}</h3>
+            {{ (neutral/total*100)|round(1) }}%
+        </div>
+    </div>
+</div>
+
+<!-- PIE CHART -->
+<div class="glass-card text-center">
+    <h4>📊 Sentiment Distribution</h4>
+    <div style="width:45%; height:300px; margin:auto;">
+        <canvas id="pieChart"></canvas>
+    </div>
+</div>
+
+<!-- BUTTON CONTROLS -->
+<div class="glass-card text-center">
+
+    <button class="btn btn-primary m-2"
+        onclick="toggleSection('top5Section')">
+        ⭐ Top 5 Comments
+    </button>
+
+
+
+    <button class="btn btn-warning m-2"
+        onclick="toggleSection('wordcloudSection')">
+        ☁ Word Cloud
+    </button>
+
+    <button class="btn btn-info m-2"
+        onclick="toggleSection('commentsSection')">
+        👁 View All Comments
+    </button>
+
+    <button class="btn btn-danger m-2"
+        onclick="toggleSection('spamSection')">
+        🚫 Spam Comments
+    </button>
+
+    <!-- ✅ NEW DOWNLOAD BUTTON -->
+    <a href="/download_report" class="btn btn-dark m-2">
+        📄 Download Full Report
+    </a>
+
+</div>
+
+<!-- TOP 5 COMMENTS -->
+<div id="top5Section" style="display:none;">
+<div class="glass-card">
+<h4>⭐ Top 5 Most Liked Comments</h4>
+{% for comment, likes in top_liked_comments %}
+<div class="comment-card">
+👍 {{ likes }} Likes<br>
+{{ comment }}
+</div>
+{% endfor %}
+</div>
+</div>
+
+<!-- SUMMARY -->
+
+
+<!-- WORD CLOUD -->
+<div id="wordcloudSection" style="display:none;">
+<div class="glass-card text-center">
+<h4>☁ Word Cloud</h4>
+<img src="{{ url_for('static', filename='wordcloud.png') }}"
+     style="width:70%; border-radius:10px;">
+</div>
+</div>
+
+<!-- ALL COMMENTS -->
+<div id="commentsSection" style="display:none;">
+
+    <div class="glass-card">
+        <h4 style="color:#22c55e;">✅ Positive Comments ({{ positive_comments|length }})</h4>
+        <div class="comment-container">
+        {% for comment in positive_comments %}
+            <div class="comment-card" style="border-left:5px solid #22c55e;">
+                {{ comment }}
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="glass-card">
+        <h4 style="color:#ef4444;">❌ Negative Comments ({{ negative_comments|length }})</h4>
+        <div class="comment-container">
+        {% for comment in negative_comments %}
+            <div class="comment-card" style="border-left:5px solid #ef4444;">
+                {{ comment }}
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="glass-card">
+        <h4 style="color:#fbbf24;">⚖ Neutral Comments ({{ neutral_comments|length }})</h4>
+        <div class="comment-container">
+        {% for comment in neutral_comments %}
+            <div class="comment-card" style="border-left:5px solid #fbbf24;">
+                {{ comment }}
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- SPAM COMMENTS -->
+<div id="spamSection" style="display:none;">
+<div class="glass-card">
+<h4 style="color:#ef4444;">🚫 Detected Spam Comments ({{ spam_comments|length }})</h4>
+
+{% if spam_comments %}
+    {% for comment in spam_comments %}
+        <div class="comment-card" style="border-left:5px solid red;">
+            {{ comment }}
+        </div>
+    {% endfor %}
+{% else %}
+    <p>No spam comments detected.</p>
+{% endif %}
+
+</div>
+</div>
+
+<!-- CHART SCRIPT -->
+<script>
+Chart.register(ChartDataLabels);
+
+new Chart(document.getElementById('pieChart'), {
+type:'pie',
+data:{
+labels:['Positive','Negative','Neutral'],
+datasets:[{
+data:[{{ positive }},{{ negative }},{{ neutral }}],
+backgroundColor:[
+'rgba(34,197,94,0.9)',
+'rgba(239,68,68,0.9)',
+'rgba(251,191,36,0.9)'
+]
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+plugins:{
+legend:{ position:'bottom', labels:{color:'white'} },
+datalabels:{
+color:'#fff',
+formatter:(value)=>{
+let total = {{ total }};
+return (value*100/total).toFixed(1) + "%";
+}
+}
+}
+}
+});
+
+function toggleSection(id) {
+    var section = document.getElementById(id);
+    section.style.display =
+        section.style.display === "none" ? "block" : "none";
+}
+</script>
+
+{% endif %}
+
+</div>
+<script>
+function toggleTheme() {
+    const body = document.body;
+    const btn = document.getElementById("themeBtn");
+
+    body.classList.toggle("light-mode");
+    body.classList.toggle("dark-mode");
+
+    if (body.classList.contains("light-mode")) {
+        btn.innerHTML = "☀ Light Mode";
+        btn.classList.remove("btn-outline-light");
+        btn.classList.add("btn-outline-dark");
+        localStorage.setItem("theme","light");
+    } else {
+        btn.innerHTML = "🌙 Dark Mode";
+        btn.classList.remove("btn-outline-dark");
+        btn.classList.add("btn-outline-light");
+        localStorage.setItem("theme","dark");
+    }
+}
+
+window.onload = function() {
+    const savedTheme = localStorage.getItem("theme");
+    const body = document.body;
+    const btn = document.getElementById("themeBtn");
+
+    if (savedTheme === "light") {
+        body.classList.remove("dark-mode");
+        body.classList.add("light-mode");
+        btn.innerHTML = "☀ Light Mode";
+        btn.classList.remove("btn-outline-light");
+        btn.classList.add("btn-outline-dark");
+    }
+};
+</script>
+</div>
+
+</body>
+</html>
