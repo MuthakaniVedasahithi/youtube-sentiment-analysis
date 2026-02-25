@@ -6,6 +6,7 @@ from wordcloud import WordCloud
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
+from io import BytesIO
 import re
 import html
 import os
@@ -236,8 +237,8 @@ def download_report():
     if not report_data:
         return "No report available."
 
-    file_path = "static/YouTube_Analysis_Report.pdf"
-    doc = SimpleDocTemplate(file_path)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer)
     elements = []
     styles = getSampleStyleSheet()
 
@@ -259,14 +260,16 @@ def download_report():
     elements.append(Paragraph(f"Neutral: {report_data['neutral']}", styles["Normal"]))
     elements.append(Spacer(1, 12))
 
-    if os.path.exists("static/wordcloud.png"):
-        elements.append(Paragraph("<b>Word Cloud:</b>", styles["Heading2"]))
-        elements.append(Image("static/wordcloud.png", width=5 * inch, height=3 * inch))
-
     doc.build(elements)
 
-    return send_file(file_path, as_attachment=True)
+    buffer.seek(0)
 
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="YouTube_Analysis_Report.pdf",
+        mimetype="application/pdf"
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
