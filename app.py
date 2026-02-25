@@ -72,7 +72,7 @@ def get_comments(video_id):
 
     comments = []
     next_page_token = None
-    MAX_COMMENTS = 200  # You can change this limit
+    MAX_COMMENTS = 30  # You can change this limit
 
     try:
         while True:
