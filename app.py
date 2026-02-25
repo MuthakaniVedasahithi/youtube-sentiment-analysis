@@ -15,7 +15,6 @@ import html
 import os
 
 
-print("ENV CHECK:", dict(os.environ))
 
 app = Flask(__name__)
 
