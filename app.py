@@ -1,37 +1,40 @@
 from flask import Flask, render_template, request, send_file
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from scipy.special import softmax
+from transformers import pipeline
 from wordcloud import WordCloud
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-import numpy as np
 import re
-import torch
 import html
 import os
 
-
-
 app = Flask(__name__)
 
+# ==============================
+# API KEY
+# ==============================
 API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 if not API_KEY:
     print("WARNING: YOUTUBE_API_KEY not found")
-MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
-model.eval()
+# ==============================
+# Load Sentiment Pipeline (Optimized)
+# ==============================
+sentiment_pipeline = pipeline(
+    "sentiment-analysis",
+    model="cardiffnlp/twitter-roberta-base-sentiment-latest"
+)
 
-# Global storage for report data
+# Store report data globally
 report_data = {}
 
 
+# ==============================
+# Extract Video ID
+# ==============================
 def extract_video_id(link):
     if "v=" in link:
         return link.split("v=")[1].split("&")[0]
@@ -42,8 +45,11 @@ def extract_video_id(link):
     return None
 
 
+# ==============================
+# Get Video Statistics
+# ==============================
 def get_video_stats(video_id):
-    youtube = build('youtube', 'v3', developerKey=API_KEY)
+    youtube = build("youtube", "v3", developerKey=API_KEY)
     try:
         request = youtube.videos().list(
             part="statistics,snippet",
@@ -51,14 +57,14 @@ def get_video_stats(video_id):
         )
         response = request.execute()
 
-        if not response['items']:
+        if not response["items"]:
             return None
 
-        stats = response['items'][0]['statistics']
-        snippet = response['items'][0]['snippet']
+        stats = response["items"][0]["statistics"]
+        snippet = response["items"][0]["snippet"]
 
         return {
-            "title": snippet['title'],
+            "title": snippet["title"],
             "views": stats.get("viewCount", 0),
             "likes": stats.get("likeCount", 0),
             "comments_count": stats.get("commentCount", 0)
@@ -67,43 +73,37 @@ def get_video_stats(video_id):
         return None
 
 
+# ==============================
+# Get Comments (LIMITED TO 10)
+# ==============================
 def get_comments(video_id):
-    youtube = build('youtube', 'v3', developerKey=API_KEY)
+    youtube = build("youtube", "v3", developerKey=API_KEY)
 
     comments = []
     next_page_token = None
-    MAX_COMMENTS = 30  # You can change this limit
+    MAX_COMMENTS = 10  # 🔥 reduced for Railway
 
     try:
         while True:
             request = youtube.commentThreads().list(
-                part="snippet,replies",
+                part="snippet",
                 videoId=video_id,
-                maxResults=100,   # max allowed per request
+                maxResults=100,
                 pageToken=next_page_token
             )
 
             response = request.execute()
 
-            for item in response.get('items', []):
-                # Top level comment
-                snippet = item['snippet']['topLevelComment']['snippet']
-                comment_text = snippet['textDisplay']
-                like_count = snippet.get('likeCount', 0)
+            for item in response.get("items", []):
+                snippet = item["snippet"]["topLevelComment"]["snippet"]
+                comment_text = snippet["textDisplay"]
+                like_count = snippet.get("likeCount", 0)
                 comments.append((comment_text, like_count))
 
-                # Replies (if any)
-                if 'replies' in item:
-                    for reply in item['replies']['comments']:
-                        reply_text = reply['snippet']['textDisplay']
-                        reply_likes = reply['snippet'].get('likeCount', 0)
-                        comments.append((reply_text, reply_likes))
-
-                # Stop if limit reached
                 if len(comments) >= MAX_COMMENTS:
                     return comments
 
-            next_page_token = response.get('nextPageToken')
+            next_page_token = response.get("nextPageToken")
 
             if not next_page_token:
                 break
@@ -114,28 +114,30 @@ def get_comments(video_id):
         return []
 
 
+# ==============================
+# Analyze Sentiment (Optimized)
+# ==============================
 def analyze_sentiment(comment):
-    comment = re.sub(r'<.*?>', '', comment)
+    comment = re.sub(r"<.*?>", "", comment)
 
-    encoded_input = tokenizer(
-        comment,
-        return_tensors='pt',
-        truncation=True,
-        padding=True,
-        max_length=256
-    )
+    if not comment.strip():
+        return "Neutral"
 
-    with torch.no_grad():
-        output = model(**encoded_input)
+    result = sentiment_pipeline(comment[:256])[0]
+    label = result["label"].upper()
 
-    scores = output.logits.detach().numpy()[0]
-    scores = softmax(scores)
-
-    labels = ['Negative', 'Neutral', 'Positive']
-    return labels[np.argmax(scores)]
+    if "NEGATIVE" in label:
+        return "Negative"
+    elif "NEUTRAL" in label:
+        return "Neutral"
+    else:
+        return "Positive"
 
 
-@app.route('/', methods=['GET', 'POST'])
+# ==============================
+# HOME ROUTE
+# ==============================
+@app.route("/", methods=["GET", "POST"])
 def home():
 
     global report_data
@@ -144,14 +146,13 @@ def home():
     positive_comments = []
     negative_comments = []
     neutral_comments = []
-    spam_comments = []
     top_liked_comments = []
     video_stats = None
     error_message = ""
 
-    if request.method == 'POST':
+    if request.method == "POST":
 
-        link = request.form.get('link')
+        link = request.form.get("link")
         video_id = extract_video_id(link)
 
         if not video_id:
@@ -160,8 +161,8 @@ def home():
             video_stats = get_video_stats(video_id)
 
             if not video_stats:
-                error_message = "Unable to fetch video details. Check if video is public or API key is valid."
-                return render_template('index.html', error_message=error_message)
+                error_message = "Unable to fetch video details."
+                return render_template("index.html", error_message=error_message)
 
             comments_data = get_comments(video_id)
 
@@ -203,34 +204,33 @@ def home():
 
                 wordcloud.to_file("static/wordcloud.png")
 
-
-
-                # Store report data
                 report_data = {
                     "video_stats": video_stats,
                     "positive": positive,
                     "negative": negative,
-                    "neutral": neutral,
-                    "spam_count": len(spam_comments)
+                    "neutral": neutral
                 }
 
     return render_template(
-        'index.html',
+        "index.html",
         positive=positive,
         negative=negative,
         neutral=neutral,
         positive_comments=positive_comments,
         negative_comments=negative_comments,
         neutral_comments=neutral_comments,
-        spam_comments=spam_comments,
         video_stats=video_stats,
         top_liked_comments=top_liked_comments,
         error_message=error_message
     )
 
 
-@app.route('/download_report')
+# ==============================
+# DOWNLOAD REPORT
+# ==============================
+@app.route("/download_report")
 def download_report():
+
     global report_data
 
     if not report_data:
@@ -241,33 +241,32 @@ def download_report():
     elements = []
     styles = getSampleStyleSheet()
 
-    elements.append(Paragraph("<b>YouTube Sentiment Analysis Report</b>", styles['Title']))
+    elements.append(Paragraph("<b>YouTube Sentiment Analysis Report</b>", styles["Title"]))
     elements.append(Spacer(1, 12))
 
     vs = report_data["video_stats"]
 
-    safe_title = html.escape(vs['title'])
-    elements.append(Paragraph(f"<b>Video Title:</b> {safe_title}", styles['Normal']))
-    elements.append(Paragraph(f"Views: {vs['views']}", styles['Normal']))
-    elements.append(Paragraph(f"Likes: {vs['likes']}", styles['Normal']))
-    elements.append(Paragraph(f"Total Comments: {vs['comments_count']}", styles['Normal']))
+    safe_title = html.escape(vs["title"])
+    elements.append(Paragraph(f"<b>Video Title:</b> {safe_title}", styles["Normal"]))
+    elements.append(Paragraph(f"Views: {vs['views']}", styles["Normal"]))
+    elements.append(Paragraph(f"Likes: {vs['likes']}", styles["Normal"]))
+    elements.append(Paragraph(f"Total Comments: {vs['comments_count']}", styles["Normal"]))
     elements.append(Spacer(1, 12))
 
-    elements.append(Paragraph("<b>Sentiment Summary:</b>", styles['Heading2']))
-    elements.append(Paragraph(f"Positive: {report_data['positive']}", styles['Normal']))
-    elements.append(Paragraph(f"Negative: {report_data['negative']}", styles['Normal']))
-    elements.append(Paragraph(f"Neutral: {report_data['neutral']}", styles['Normal']))
+    elements.append(Paragraph("<b>Sentiment Summary:</b>", styles["Heading2"]))
+    elements.append(Paragraph(f"Positive: {report_data['positive']}", styles["Normal"]))
+    elements.append(Paragraph(f"Negative: {report_data['negative']}", styles["Normal"]))
+    elements.append(Paragraph(f"Neutral: {report_data['neutral']}", styles["Normal"]))
     elements.append(Spacer(1, 12))
-
 
     if os.path.exists("static/wordcloud.png"):
-        elements.append(Paragraph("<b>Word Cloud:</b>", styles['Heading2']))
-        elements.append(Image("static/wordcloud.png", width=5*inch, height=3*inch))
+        elements.append(Paragraph("<b>Word Cloud:</b>", styles["Heading2"]))
+        elements.append(Image("static/wordcloud.png", width=5 * inch, height=3 * inch))
 
     doc.build(elements)
 
     return send_file(file_path, as_attachment=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
