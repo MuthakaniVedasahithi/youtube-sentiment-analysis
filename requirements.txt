@@ -4,7 +4,7 @@ gunicorn==25.1.0
 google-api-python-client==2.190.0
 transformers==4.41.2
 torch==2.2.2
-numpy==2.2.6
+numpy==1.26.4
 scipy==1.15.3
 wordcloud==1.9.6
 reportlab==4.4.10
