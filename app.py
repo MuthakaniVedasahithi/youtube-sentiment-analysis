@@ -17,6 +17,8 @@ import os
 app = Flask(__name__)
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
+if not API_KEY:
+    raise ValueError("YOUTUBE_API_KEY not found in environment variables")
 MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -153,6 +155,11 @@ def home():
             error_message = "Invalid YouTube Link!"
         else:
             video_stats = get_video_stats(video_id)
+
+            if not video_stats:
+                error_message = "Unable to fetch video details. Check if video is public or API key is valid."
+                return render_template('index.html', error_message=error_message)
+
             comments_data = get_comments(video_id)
 
             if comments_data:
@@ -178,6 +185,9 @@ def home():
                     key=lambda x: x[1],
                     reverse=True
                 )[:5]
+
+                if not all_text.strip():
+                    all_text = "No comments available"
 
                 wordcloud = WordCloud(
                     width=800,
