@@ -17,8 +17,9 @@ import os
 app = Flask(__name__)
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
+
 if not API_KEY:
-    raise ValueError("YOUTUBE_API_KEY not found in environment variables")
+    print("WARNING: YOUTUBE_API_KEY not found")
 MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
