@@ -14,6 +14,9 @@ import torch
 import html
 import os
 
+
+print("ENV CHECK:", dict(os.environ))
+
 app = Flask(__name__)
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
